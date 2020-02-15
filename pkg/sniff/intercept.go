@@ -2,6 +2,7 @@ package sniff
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net/http"
 	"time"
@@ -26,19 +27,16 @@ import (
 // it sees, logging them.
 
 // httpStreamFactory implements tcpassembly.StreamFactory
-type httpStreamFactory struct{}
-
-// httpStream will handle the actual decoding of http requests.
-type httpStream struct {
-	net, transport gopacket.Flow
-	r              tcpreader.ReaderStream
+type httpStreamFactory struct {
+	logger *log.Logger
 }
 
 func (h *httpStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
-	hstream := &httpStream{
+	hstream := &httpXStream{
 		net:       net,
 		transport: transport,
 		r:         tcpreader.NewReaderStream(),
+		logger:    h.logger,
 	}
 	go hstream.run() // Important... we must guarantee that data from the reader stream is read.
 
@@ -46,28 +44,37 @@ func (h *httpStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream
 	return &hstream.r
 }
 
-func (h *httpStream) run() {
+// httpStream will handle the actual decoding of http requests.
+type httpXStream struct {
+	net       gopacket.Flow
+	transport gopacket.Flow
+	r         tcpreader.ReaderStream
+	logger    *log.Logger
+}
+
+func (h *httpXStream) run() {
 	buf := bufio.NewReader(&h.r)
 	for {
+		// TODO: Detect the packet type before reading
 		req, err := http.ReadRequest(buf)
 		if err == io.EOF {
 			// We must read until we see an EOF... very important!
 			return
 		} else if err != nil {
-			log.Println("Error reading stream", h.net, h.transport, ":", err)
+			h.logger.Warnf("http.ReadRequest error reading stream %v %v %s %v", h.net, h.transport, ":", err)
 		} else {
+			h.logger.WithFields(log.Fields{"host": req.Host, "header": req.Header, "method": req.Method}).Info("http packet read")
 			bodyBytes := tcpreader.DiscardBytesToEOF(req.Body)
 			req.Body.Close()
-			log.Println("Received request from stream", h.net, h.transport, ":", req, "with", bodyBytes, "bytes in request body")
+			h.logger.Infof("Received request from stream %v %v : %v with %v bytes in request body", h.net, h.transport, req, bodyBytes)
 		}
 	}
 }
 
 // InterfaceListener establishes a libpcap listener and BPF matching
 // for capturing and reconstructing packets.
-func InterfaceListener(iface, bpfFilter string, snaplen int, logger *log.Logger) {
+func InterfaceListener(ctx context.Context, iface, bpfFilter string, snaplen int, logger *log.Logger) {
 	// TODO: Return reconstructed packet data via channel.
-	//? defer util.Run()()
 	var handle *pcap.Handle
 	var err error
 
@@ -83,7 +90,9 @@ func InterfaceListener(iface, bpfFilter string, snaplen int, logger *log.Logger)
 	}
 
 	// Set up assembly
-	streamFactory := &httpStreamFactory{}
+	streamFactory := &httpStreamFactory{
+		logger: logger,
+	}
 	streamPool := tcpassembly.NewStreamPool(streamFactory)
 	assembler := tcpassembly.NewAssembler(streamPool)
 
@@ -94,18 +103,16 @@ func InterfaceListener(iface, bpfFilter string, snaplen int, logger *log.Logger)
 	ticker := time.Tick(time.Minute)
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case packet := <-packets:
-			// A nil packet indicates the end of a pcap file.
-			if packet == nil {
-				return
-			}
-			logger.Tracef("%#v", packet)
 			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
 				logger.Debug("Unusable packet")
 				continue
 			}
 			tcp := packet.TransportLayer().(*layers.TCP)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
+			logger.Infof("%v", packet.String())
 
 		case <-ticker:
 			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
