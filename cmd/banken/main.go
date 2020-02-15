@@ -32,7 +32,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	// Cobra configuration
-	bpf = pflag.String(flagBPF, "tcp port 80", "BPF configuration string")
+	bpf = pflag.String(flagBPF, "tcp port 80 or port 443", "BPF configuration string")
 	logLevel = pflag.String(flagLogLevel, "info", "verbosity of logging")
 	logSink = pflag.String(flagLogSink, "", "logging destination, leave blank to disable")
 	alertThreshold = pflag.Int("alert-threshold", 100, "alerting threshold of http requests per 2 minute span ")
@@ -88,9 +88,16 @@ func main() {
 	defer can()
 
 	// Initialize command
+	// TODO: Detect interfaces
 	// Initialize sniffer
 	bpfFlag := viper.GetString("bpf")
-	sniff.InterfaceListener(runCtx, "wlp3s0", bpfFlag, 16000, logger)
+	ifaces := []string{"wlp3s0", "lo"}
+	for _, iface := range ifaces {
+		go func(iface string) {
+			ctxLogger := logger.WithFields(log.Fields{"iface": iface})
+			sniff.InterfaceListener(runCtx, iface, bpfFlag, 1600, ctxLogger.Logger)
+		}(iface)
+	}
 
 	// TODO: Initizlize Traffic Monitor alerter
 	// TODO: Initialize Route Monitor

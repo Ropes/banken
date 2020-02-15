@@ -58,17 +58,39 @@ func (h *httpXStream) run() {
 		// TODO: Detect the packet type before reading
 		req, err := http.ReadRequest(buf)
 		if err == io.EOF {
+			h.logger.Trace("EOF signaled")
 			// We must read until we see an EOF... very important!
 			return
 		} else if err != nil {
-			h.logger.Warnf("http.ReadRequest error reading stream %v %v %s %v", h.net, h.transport, ":", err)
+			var errStr string
+			if len(err.Error()) > 30 {
+				errStr = err.Error()[:30]
+			} else {
+				errStr = err.Error()
+			}
+			h.logger.WithFields(log.Fields{"net": h.net, "transport": h.transport, "err": errStr}).
+				Tracef("http.ReadRequest error reading packet")
 		} else {
-			h.logger.WithFields(log.Fields{"host": req.Host, "header": req.Header, "method": req.Method}).Info("http packet read")
+			h.logger.WithFields(log.Fields{"host": req.Host, "path": req.URL.Path, "method": req.Method,
+				"transport": h.transport, "net": h.net, "time": time.Now()}).Info("httpX packet read")
+			/* 	don't need data from body
 			bodyBytes := tcpreader.DiscardBytesToEOF(req.Body)
 			req.Body.Close()
 			h.logger.Infof("Received request from stream %v %v : %v with %v bytes in request body", h.net, h.transport, req, bodyBytes)
+			*/
 		}
 	}
+}
+
+// HTTPXPacket provides information to categorize HTTP requests.
+type HTTPXPacket struct {
+	TS        time.Time
+	Protocol  string
+	Host      string
+	Path      string
+	Method    string
+	Transport string
+	Net       string
 }
 
 // InterfaceListener establishes a libpcap listener and BPF matching
@@ -107,12 +129,12 @@ func InterfaceListener(ctx context.Context, iface, bpfFilter string, snaplen int
 			return
 		case packet := <-packets:
 			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
-				logger.Debug("Unusable packet")
+				logger.Tracef("Unreadable packet: %#v", packet.String())
 				continue
 			}
 			tcp := packet.TransportLayer().(*layers.TCP)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
-			logger.Infof("%v", packet.String())
+			//logger.Infof("%v", packet.String())
 
 		case <-ticker:
 			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
