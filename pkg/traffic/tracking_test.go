@@ -78,6 +78,14 @@ func TestConcurrentKeyMap(t *testing.T) {
 			i:       50000,
 			workers: 5,
 		},
+		{
+			i:       5,
+			workers: 50,
+		},
+		{
+			i:       50000,
+			workers: 500,
+		},
 	}
 	type tup struct {
 		key string
