@@ -62,6 +62,7 @@ func (h *httpXStream) run() {
 			// We must read until we see an EOF... very important!
 			return
 		} else if err != nil {
+			// Common error case from TCP SYN, ACK communication.
 			var errStr string
 			if len(err.Error()) > 30 {
 				errStr = err.Error()[:30]
@@ -70,14 +71,13 @@ func (h *httpXStream) run() {
 			}
 			h.logger.WithFields(log.Fields{"net": h.net, "transport": h.transport, "err": errStr}).
 				Tracef("http.ReadRequest error reading packet")
-		} else {
+		} else if req != nil {
+			// HTTP data was read into request
 			h.logger.WithFields(log.Fields{"host": req.Host, "path": req.URL.Path, "method": req.Method,
 				"transport": h.transport, "net": h.net, "time": time.Now()}).Info("httpX packet read")
-			/* 	don't need data from body
-			bodyBytes := tcpreader.DiscardBytesToEOF(req.Body)
-			req.Body.Close()
-			h.logger.Infof("Received request from stream %v %v : %v with %v bytes in request body", h.net, h.transport, req, bodyBytes)
-			*/
+			// TODO: Create HTTPXPacket to return to processors.
+		} else {
+			h.logger.Trace("http packet read failed")
 		}
 	}
 }
