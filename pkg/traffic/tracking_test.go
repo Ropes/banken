@@ -63,3 +63,67 @@ func TestZeroValues(t *testing.T) {
 		})
 	}
 }
+
+func TestConcurrentKeyMap(t *testing.T) {
+	keys := []string{"hihi", "inu", "おはよう", "felt"}
+	tests := []struct {
+		i       int
+		workers int
+	}{
+		{
+			i:       5,
+			workers: 5,
+		},
+		{
+			i:       50000,
+			workers: 5,
+		},
+	}
+	type tup struct {
+		key string
+		cnt uint64
+	}
+
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			rc := new(RequestCounter)
+			work := make(chan tup, 1)
+			var wg sync.WaitGroup
+			for i := 0; i < test.workers; i++ {
+				wg.Add(1)
+				go func(work chan tup) {
+					for x := range work {
+						rc.IncKey(x.key, x.cnt)
+					}
+					wg.Done()
+				}(work)
+			}
+
+			for i := 0; i < test.i; i++ {
+				for _, k := range keys {
+					work <- tup{
+						cnt: uint64(1),
+						key: k,
+					}
+				}
+			}
+			fmt.Println("work submitted to group")
+			close(work)
+			wg.Wait()
+
+			output := rc.Export()
+			for _, k := range keys {
+				v, ok := output[k]
+				if !ok {
+					t.Errorf("key %q not found in exported map", k)
+				} else {
+					if int(v) != test.i {
+						t.Errorf("key %q: value %d != %d", k, v, test.i)
+					}
+				}
+
+			}
+		})
+	}
+
+}
