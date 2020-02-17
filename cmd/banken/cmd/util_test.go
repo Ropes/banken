@@ -27,7 +27,7 @@ func TestHTTPSlug(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out := HttpURLSlug(domain, test.path)
+		out := HTTPURLSlug(domain, test.path)
 		exp := "http://" + domain + test.expPath
 		if exp != out {
 			t.Errorf("incorrect path returned: %q, exp: %q", out, exp)

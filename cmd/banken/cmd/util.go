@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// HttpURLSlug reduces the path down to only its first element
+// HTTPURLSlug reduces the path down to only its first element
 // iff the path exists.
-func HttpURLSlug(domain, path string) string {
+func HTTPURLSlug(domain, path string) string {
 	slug := strings.Split(path[1:], "/")
 	var p string
 	if len(slug) > 0 {
