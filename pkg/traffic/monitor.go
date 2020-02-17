@@ -18,10 +18,6 @@ func (c *clock) Time() time.Time {
 	return c.t
 }
 
-func (c *clock) Set(t time.Time) {
-	c.t = t
-}
-
 // Monitor aggregates http request counts into a searchable data
 // structure.
 type Monitor struct {
