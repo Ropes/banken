@@ -53,3 +53,6 @@ Guard dog application monitoring HTTP traffic on local interfaces.
     * 2: termui with nice updates and recording of data.
     * 3: Mix of the two possible with anomaly recordings streaming up and lower section containing the stats box/window?
 
+## Acknowledgements
+
+* Hard-copy import of the still experimental [golang.org/x/net/internal/timseries](https://pkg.go.dev/golang.org/x/net@v0.0.0-20200202094626-16171245cfb2/internal/timeseries?tab=doc) package to manage data. Package used by `x/net/trace` for compiling traffic statistics.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net"
 	"os"
 	"os/signal"
 
@@ -79,6 +80,18 @@ func catchCancelSignal(can context.CancelFunc, sig ...os.Signal) {
 	}()
 }
 
+func detectInterfaces() ([]string, error) {
+	output := make([]string, 0)
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range ifaces {
+		output = append(output, i.Name)
+	}
+	return output, nil
+}
+
 func main() {
 	logger := configuration()
 
@@ -89,9 +102,12 @@ func main() {
 
 	// Initialize command
 	// TODO: Detect interfaces
+	ifaces, err := detectInterfaces()
+	if err != nil {
+		logger.Fatal(err)
+	}
 	// Initialize sniffer
 	bpfFlag := viper.GetString("bpf")
-	ifaces := []string{"wlp3s0", "lo"}
 	for _, iface := range ifaces {
 		go func(iface string) {
 			ctxLogger := logger.WithFields(log.Fields{"iface": iface})
@@ -99,7 +115,7 @@ func main() {
 		}(iface)
 	}
 
-	// TODO: Initizlize Traffic Monitor alerter
+	// TODO: Initialize Traffic Monitor alerter
 	// TODO: Initialize Route Monitor
 
 	// TODO: Duplex data streams
