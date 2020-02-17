@@ -28,11 +28,15 @@ import (
 
 // httpStreamFactory implements tcpassembly.StreamFactory
 type httpStreamFactory struct {
+	ctx    context.Context
+	output chan HTTPXPacket
 	logger *log.Logger
 }
 
 func (h *httpStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 	hstream := &httpXStream{
+		ctx:       h.ctx,
+		output:    h.output,
 		net:       net,
 		transport: transport,
 		r:         tcpreader.NewReaderStream(),
@@ -46,57 +50,76 @@ func (h *httpStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream
 
 // httpStream will handle the actual decoding of http requests.
 type httpXStream struct {
+	ctx       context.Context
 	net       gopacket.Flow
 	transport gopacket.Flow
 	r         tcpreader.ReaderStream
 	logger    *log.Logger
+	output    chan HTTPXPacket
 }
 
 func (h *httpXStream) run() {
 	buf := bufio.NewReader(&h.r)
 	for {
-		// TODO: Detect the packet type before reading
-		req, err := http.ReadRequest(buf)
-		if err == io.EOF {
-			h.logger.Trace("EOF signaled")
-			// We must read until we see an EOF... very important!
+		select {
+		case <-h.ctx.Done():
 			return
-		} else if err != nil {
-			// Common error case from TCP SYN, ACK communication.
-			var errStr string
-			if len(err.Error()) > 30 {
-				errStr = err.Error()[:30]
+		default:
+			// Constructs HTTP request from bytes read.
+			req, err := http.ReadRequest(buf)
+			if err == io.EOF {
+				h.logger.Trace("EOF signaled")
+				// We must read until we see an EOF... very important!
+				return
+			} else if err != nil {
+				// Common error case from HTTPS packets communication.
+				var errStr string
+				if len(err.Error()) > 30 {
+					errStr = err.Error()[:30]
+				} else {
+					errStr = err.Error()
+				}
+				h.logger.WithFields(log.Fields{"net": h.net, "transport": h.transport, "err": errStr}).
+					Tracef("http.ReadRequest error reading packet")
+			} else if req != nil {
+				// HTTP data was read into request
+				h.logger.WithFields(log.Fields{"host": req.Host, "path": req.URL.Path, "method": req.Method,
+					"transport": h.transport, "net": h.net, "time": time.Now()}).Info("httpX packet read")
+				// Create HTTPXPacket to return to processors.
+				hp := HTTPXPacket{
+					TS:       time.Now(),
+					Protocol: "http",
+					Host:     req.Host,
+					Path:     req.URL.Path,
+					Method:   req.Method,
+					Port:     h.transport.String(),
+					Net:      h.net.String(),
+				}
+				if h.output != nil {
+					h.output <- hp
+				}
 			} else {
-				errStr = err.Error()
+				h.logger.Trace("http packet read failed")
 			}
-			h.logger.WithFields(log.Fields{"net": h.net, "transport": h.transport, "err": errStr}).
-				Tracef("http.ReadRequest error reading packet")
-		} else if req != nil {
-			// HTTP data was read into request
-			h.logger.WithFields(log.Fields{"host": req.Host, "path": req.URL.Path, "method": req.Method,
-				"transport": h.transport, "net": h.net, "time": time.Now()}).Info("httpX packet read")
-			// TODO: Create HTTPXPacket to return to processors.
-		} else {
-			h.logger.Trace("http packet read failed")
 		}
 	}
 }
 
 // HTTPXPacket provides information to categorize HTTP requests.
 type HTTPXPacket struct {
-	TS        time.Time
-	Protocol  string
-	Host      string
-	Path      string
-	Method    string
-	Transport string
-	Net       string
+	TS       time.Time
+	Protocol string
+	Host     string
+	Path     string
+	Method   string
+	Port     string
+	Net      string
 }
 
 // InterfaceListener establishes a libpcap listener and BPF matching
 // for capturing and reconstructing packets.
-func InterfaceListener(ctx context.Context, iface, bpfFilter string, snaplen int, logger *log.Logger) {
-	// TODO: Return reconstructed packet data via channel.
+func InterfaceListener(ctx context.Context, stream chan HTTPXPacket, iface, bpfFilter string, snaplen int, logger *log.Logger) {
+	// Return reconstructed packet data via channel.
 	var handle *pcap.Handle
 	var err error
 
@@ -111,8 +134,10 @@ func InterfaceListener(ctx context.Context, iface, bpfFilter string, snaplen int
 		logger.Fatal(err)
 	}
 
-	// Set up assembly
+	// Configure stream producer
 	streamFactory := &httpStreamFactory{
+		ctx:    ctx,
+		output: stream,
 		logger: logger,
 	}
 	streamPool := tcpassembly.NewStreamPool(streamFactory)

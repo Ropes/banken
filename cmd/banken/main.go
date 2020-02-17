@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/ropes/banken/cmd/banken/cmd"
 	"github.com/ropes/banken/pkg/sniff"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -101,24 +102,38 @@ func main() {
 	defer can()
 
 	// Initialize command
-	// TODO: Detect interfaces
+	// Detect interfaces
 	ifaces, err := detectInterfaces()
 	if err != nil {
 		logger.Fatal(err)
-	}
-	// Initialize sniffer
-	bpfFlag := viper.GetString("bpf")
-	for _, iface := range ifaces {
-		go func(iface string) {
-			ctxLogger := logger.WithFields(log.Fields{"iface": iface})
-			sniff.InterfaceListener(runCtx, iface, bpfFlag, 1600, ctxLogger.Logger)
-		}(iface)
 	}
 
 	// TODO: Initialize Traffic Monitor alerter
 	// TODO: Initialize Route Monitor
 
-	// TODO: Duplex data streams
-	// TODO: Wait
+	// Initialize sniffer
+	bpfFlag := viper.GetString("bpf")
+	packetStream := make(chan sniff.HTTPXPacket, 5)
+	// Initialze stream consumers before reading packets
+	const consumers = 5
+	for i := 0; i < consumers; i++ {
+		go func() {
+			for p := range packetStream {
+				// TODO: Increment traffic counter
+				// TODO:
+				log.Infof("PacketConsumer received: %v",
+					cmd.HTTPURLSlug(p.Host, p.Path))
+			}
+		}()
+	}
+
+	for _, iface := range ifaces {
+		go func(iface string) {
+			ctxLogger := logger.WithFields(log.Fields{"iface": iface})
+			sniff.InterfaceListener(runCtx, packetStream, iface, bpfFlag, 1600, ctxLogger.Logger)
+		}(iface)
+	}
+
+	// Wait for stop signal
 	<-runCtx.Done()
 }
