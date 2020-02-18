@@ -7,15 +7,34 @@ import (
 	"time"
 )
 
+var _ (Notification) = (*Alert)(nil)
+var _ (Notification) = (*NominalStatus)(nil)
+
 // Notification of AlertDetector state back to caller.
-// TODO: Convert to Interface
-type Notification string
+type Notification interface {
+	String() string
+}
 
 // Alert caller to request limit breach.
-type Alert Notification
+type Alert struct {
+	hits int
+	ts   time.Time
+}
+
+// Alert formats state of alert to caller.
+func (a Alert) String() string {
+	return fmt.Sprintf("High traffic generated an alert - hits = %d, triggered at %v", a.hits, a.ts)
+}
 
 // NominalStatus returned to caller.
-type NominalStatus Notification
+type NominalStatus struct {
+	ts time.Time
+}
+
+// String formats state information to watcher.
+func (s NominalStatus) String() string {
+	return fmt.Sprintf("Traffic within nominal parameters - time: %v", a.hits, a.ts)
+}
 
 // StateFunc provides clean transitions between
 // code execution paths.
@@ -28,6 +47,7 @@ type AlertDetector struct {
 	monitor       *Monitor
 	upperLimit    int
 	testSpan      time.Duration
+	testTicker    *time.Ticker
 	checkInterval time.Duration
 	notify        chan Notification
 
@@ -41,15 +61,16 @@ type AlertDetector struct {
 func NewAlertDetector(ctx context.Context, now time.Time, alertThreshold int, notification chan Notification) *AlertDetector {
 	m := NewMonitor(now)
 	zero := uint64(0)
+	testTick := time.NewTicker(2 * time.Second)
 
 	ad := &AlertDetector{
-		ctx:           ctx,
-		upperLimit:    alertThreshold,
-		testSpan:      2 * time.Minute,
-		checkInterval: 2 * time.Second,
-		monitor:       m,
-		localInc:      &zero,
-		flush:         time.NewTicker(2 * time.Second),
+		ctx:        ctx,
+		upperLimit: alertThreshold,
+		testSpan:   2 * time.Minute,
+		testTicker: testTick,
+		monitor:    m,
+		localInc:   &zero,
+		flush:      time.NewTicker(2 * time.Second),
 
 		notify:     notification,
 		startState: Nominal,
@@ -70,15 +91,14 @@ func (a *AlertDetector) Increment(inc int, now time.Time) {
 // iff threshold is broken, switch to Alerting state and notify
 // output.
 func Nominal(a *AlertDetector) StateFunc {
-	chkTick := time.NewTicker(a.checkInterval)
 	for {
 		select {
 		case <-a.ctx.Done():
 			return nil
-		case now := <-chkTick.C:
+		case now := <-a.testTicker.C:
 			v := a.monitor.RecentSum(a.testSpan)
 			if v > a.upperLimit { // Alerting threshold triggered
-				a.notify <- Notification(fmt.Sprintf("now: %v", now))
+				a.notify <- Alert{ts: now, hits: v}
 				return Alerted
 			}
 		}
@@ -90,15 +110,14 @@ func Nominal(a *AlertDetector) StateFunc {
 // iff monitored timespan request count drops below the uppperLimit
 // the state returns to Nominal and notifies output.
 func Alerted(a *AlertDetector) StateFunc {
-	chkTick := time.NewTicker(a.checkInterval)
 	for {
 		select {
 		case <-a.ctx.Done():
 			return nil
-		case now := <-chkTick.C:
+		case now := <-a.testTicker.C:
 			v := a.monitor.RecentSum(a.testSpan)
 			if v < a.upperLimit {
-				a.notify <- Notification(fmt.Sprintf("now: %v", now))
+				a.notify <- NominalStatus{ts: now}
 				return Nominal
 			}
 		}
@@ -127,5 +146,4 @@ func (a *AlertDetector) runState() {
 	for state != nil {
 		state = state(a)
 	}
-	// TODO: shutdown logic
 }
