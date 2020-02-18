@@ -33,7 +33,7 @@ type NominalStatus struct {
 
 // String formats state information to watcher.
 func (s NominalStatus) String() string {
-	return fmt.Sprintf("Traffic within nominal parameters - time: %v", a.hits, a.ts)
+	return fmt.Sprintf("Traffic within nominal parameters - time: %v", s.ts)
 }
 
 // StateFunc provides clean transitions between

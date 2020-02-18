@@ -5,10 +5,12 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/ropes/banken/cmd/banken/cmd"
 	"github.com/ropes/banken/pkg/sniff"
+	"github.com/ropes/banken/pkg/traffic"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -108,21 +110,33 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	// TODO: Initialize Traffic Monitor alerter
-	// TODO: Initialize Route Monitor
+	// Initialize Traffic Monitor alerter
+	notifications := make(chan traffic.Notification, 1)
+	ad := traffic.NewAlertDetector(runCtx, time.Now(), 5, notifications)
+	go func(a *traffic.AlertDetector, logger *log.Logger) {
+		for n := range notifications {
+			logger.Info(n.String())
+		}
+	}(ad, logger)
+
+	// Initialize Route Counter
+	rc := new(traffic.RequestCounter)
 
 	// Initialize sniffer
 	bpfFlag := viper.GetString("bpf")
-	packetStream := make(chan sniff.HTTPXPacket, 5)
-	// Initialze stream consumers before reading packets
 	const consumers = 5
+	packetStream := make(chan sniff.HTTPXPacket, consumers)
+	// Initialze stream consumers before reading packets
 	for i := 0; i < consumers; i++ {
 		go func() {
 			for p := range packetStream {
-				// TODO: Increment traffic counter
-				// TODO:
-				log.Infof("PacketConsumer received: %v",
-					cmd.HTTPURLSlug(p.Host, p.Path))
+				// Increment traffic counter
+				ad.Increment(1, p.TS)
+
+				// Record the URL's route to counter
+				u := cmd.HTTPURLSlug(p.Host, p.Path)
+				log.Infof("PacketConsumer received: %v", u)
+				rc.IncKey(u, uint64(1))
 			}
 		}()
 	}
