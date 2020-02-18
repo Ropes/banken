@@ -1,6 +1,7 @@
 package traffic
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ropes/banken/pkg/traffic/internal/timeseries"
@@ -18,10 +19,17 @@ func (c *clock) Time() time.Time {
 	return c.t
 }
 
+type nowClock struct{}
+
+func (c *nowClock) Time() time.Time {
+	return time.Now()
+}
+
 // Monitor aggregates http request counts into a searchable data
 // structure.
 type Monitor struct {
-	tsdb *timeseries.TimeSeries
+	tsdb   *timeseries.TimeSeries
+	incMux sync.Mutex
 }
 
 // NewMonitor initializes the data type with clock and NewFloat observable
@@ -30,7 +38,8 @@ type Monitor struct {
 // The internal timeseries operation requires that Increment calls timestamp
 // not surpass the timeseries's clock time. Primarily a testing concern.
 func NewMonitor(t time.Time) *Monitor {
-	c := newclock(t)
+	//c := newclock(t)
+	c := &nowClock{}
 	return &Monitor{
 		tsdb: timeseries.NewTimeSeriesWithClock(timeseries.NewFloat, c),
 	}
@@ -41,7 +50,9 @@ func (tm *Monitor) Increment(i int, clock time.Time) {
 	f := new(timeseries.Float)
 	*f = timeseries.Float(i)
 
+	tm.incMux.Lock()
 	tm.tsdb.AddWithTime(f, clock)
+	tm.incMux.Unlock()
 }
 
 // RangeSum aggregates the occurrences within the delta duration parameter.

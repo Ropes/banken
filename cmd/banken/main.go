@@ -115,12 +115,23 @@ func main() {
 	ad := traffic.NewAlertDetector(runCtx, time.Now(), 5, notifications)
 	go func(a *traffic.AlertDetector, logger *log.Logger) {
 		for n := range notifications {
-			logger.Info(n.String())
+			logger.Infof("Alert Notification: %q", n.String())
 		}
 	}(ad, logger)
 
 	// Initialize Route Counter
 	rc := new(traffic.RequestCounter)
+	rcTick := time.NewTicker(10 * time.Second)
+	go func() {
+		for range rcTick.C {
+			m := rc.Export()
+			logger.Infof("Common URLs")
+			for k, v := range m {
+				logger.Infof("%v %d", k, v)
+			}
+
+		}
+	}()
 
 	// Initialize sniffer
 	bpfFlag := viper.GetString("bpf")
@@ -131,7 +142,7 @@ func main() {
 		go func() {
 			for p := range packetStream {
 				// Increment traffic counter
-				ad.Increment(1, p.TS)
+				ad.Increment(1, time.Now())
 
 				// Record the URL's route to counter
 				u := cmd.HTTPURLSlug(p.Host, p.Path)
