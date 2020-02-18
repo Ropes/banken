@@ -23,10 +23,7 @@ type Monitor struct {
 
 // NewMonitor initializes the data type with clock and NewFloat observable
 // for storing time series data points.
-//
-// The internal timeseries operation requires that Increment calls timestamp
-// not surpass the timeseries's clock time. Primarily a testing concern.
-func NewMonitor(t time.Time) *Monitor {
+func NewMonitor() *Monitor {
 	c := &nowClock{}
 	return &Monitor{
 		tsdb: timeseries.NewTimeSeriesWithClock(timeseries.NewFloat, c),

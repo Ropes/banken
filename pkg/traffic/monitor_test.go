@@ -12,7 +12,7 @@ func TestSimple(t *testing.T) {
 	start := now.Add(-20 * time.Minute)
 
 	//ts := newTestMonitor(tsNow)
-	ts := NewMonitor(now)
+	ts := NewMonitor()
 	ts.Increment(nominalInc, now)
 
 	// Test adding older time series data, and querying the data by range.
@@ -62,7 +62,7 @@ func TestHeavyLoad(t *testing.T) {
 			now := time.Now()
 			start := now.Add(-test.timeSpan)
 			t.Logf("span: %v - %v", start, now)
-			ts := NewMonitor(now)
+			ts := NewMonitor()
 			split := test.timeSpan.Seconds() / float64(test.inc)
 			t.Logf("time split base: %v", time.Second*time.Duration(int(split)))
 
@@ -116,7 +116,7 @@ func TestHeavyDenseIncrementing(t *testing.T) {
 			now := time.Now()
 			start := now.Add(-test.timeSpan)
 			t.Logf("span: %v - %v", start, now)
-			ts := NewMonitor(now)
+			ts := NewMonitor()
 			expInc := int(test.timeSpan.Seconds()) * test.inc
 			t.Logf("timespan: %v, incrementing: %d", test.timeSpan, expInc)
 
@@ -172,7 +172,7 @@ func TestHeavyDenseIncrementingNormalInit(t *testing.T) {
 			startTime := time.Now().Add(-test.timeSpan)
 			tsNow := time.Now()
 			t.Logf("span: %v - %v", startTime, tsNow)
-			ts := NewMonitor(tsNow)
+			ts := NewMonitor()
 			expInc := int(test.timeSpan.Seconds()) * test.inc
 			t.Logf("timespan: %v, incrementing: %d", test.timeSpan, expInc)
 

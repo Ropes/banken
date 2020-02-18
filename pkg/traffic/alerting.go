@@ -68,7 +68,7 @@ type AlertDetector struct {
 
 // NewAlertDetector initializes alerting of events when
 func NewAlertDetector(ctx context.Context, now time.Time, alertThreshold int, notification chan Notification) *AlertDetector {
-	m := NewMonitor(now)
+	m := NewMonitor()
 	zero := uint64(0)
 	testTick := time.NewTicker(2 * time.Second)
 
@@ -92,7 +92,7 @@ func NewAlertDetector(ctx context.Context, now time.Time, alertThreshold int, no
 // TODO: Remove
 func newTestAlertDetector(ctx context.Context, now time.Time, alertThreshold int, notification chan Notification) *AlertDetector {
 	ad := NewAlertDetector(ctx, now, alertThreshold, notification)
-	ad.monitor = NewMonitor(now)
+	ad.monitor = NewMonitor()
 	return ad
 }
 
