@@ -26,34 +26,14 @@ func TestAtomicUnderstanding(t *testing.T) {
 
 }
 
-func TestGetStateLogic(t *testing.T) {
-	ctx := context.Background()
-	start := time.Now()
-	notify := make(chan Notification, 1)
-
-	ad := newTestAlertDetector(ctx, start, 10, notify)
-
-	switch reflect.ValueOf(ad.activeState).Pointer() {
-	case reflect.ValueOf(Nominal).Pointer():
-		t.Logf("Nominalstate detected")
-	case reflect.ValueOf(Alerted).Pointer():
-		v := ad.monitor.RecentSum(ad.testSpan)
-		t.Errorf("alert detected %d", v)
-	default:
-		t.Errorf("ad state: %v %v %v", reflect.ValueOf(ad.activeState), reflect.ValueOf(Nominal),
-			"neh")
-	}
-}
-
 func TestBasicAlert(t *testing.T) {
 	ctx := context.Background()
 	start := time.Now()
 	step := start.Add(1 * time.Minute)
 	notify := make(chan Notification, 1)
 
-	//ad := newTestAlertDetector(ctx, start.Add(2*time.Minute), 10, notify)
-	ad := NewAlertDetector(ctx, start, 10, notify)
-	ad.testSpan = 1 * time.Minute
+	ad := newTestAlertDetector(ctx, 10, notify, Nominal, 1*time.Minute)
+
 	// Assert state is nominal
 	state := ad.GetState()
 	if reflect.TypeOf(state) != reflect.TypeOf(NominalStatus{}) {
@@ -82,13 +62,10 @@ func TestBasicAlert(t *testing.T) {
 
 func TestExitAlertStatus(t *testing.T) {
 	ctx := context.Background()
-	start := time.Now()
 	notify := make(chan Notification, 1)
 
 	//ad := newTestAlertDetector(ctx, start.Add(2*time.Minute), 10, notify)
-	ad := NewAlertDetector(ctx, start, 10, notify)
-	ad.testSpan = 1 * time.Minute
-	ad.activeState = Alerted // Set test state to Alerted
+	ad := newTestAlertDetector(ctx, 10, notify, Alerted, 1*time.Minute)
 
 	// Assert state is Alerted
 	state := ad.GetState()

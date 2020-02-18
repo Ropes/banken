@@ -3,7 +3,6 @@ package traffic
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync/atomic"
 	"time"
 )
@@ -63,7 +62,8 @@ type AlertDetector struct {
 	localInc *uint64
 	flush    *time.Ticker
 
-	activeState StateFunc
+	startState StateFunc
+	getState   chan struct{}
 }
 
 // NewAlertDetector initializes alerting of events when
@@ -81,18 +81,36 @@ func NewAlertDetector(ctx context.Context, now time.Time, alertThreshold int, no
 		localInc:   &zero,
 		flush:      time.NewTicker(2 * time.Second),
 
-		notify:      notification,
-		activeState: Nominal,
+		notify:     notification,
+		startState: Nominal,
+		getState:   make(chan struct{}, 1),
 	}
 	go ad.flushIncrements()
 	go ad.runState()
 	return ad
 }
 
-// TODO: Remove
-func newTestAlertDetector(ctx context.Context, now time.Time, alertThreshold int, notification chan Notification) *AlertDetector {
-	ad := NewAlertDetector(ctx, now, alertThreshold, notification)
-	ad.monitor = NewMonitor()
+// newTestAlertDetector used to configure state for testing.
+func newTestAlertDetector(ctx context.Context, alertThreshold int, notification chan Notification, state StateFunc, timeSpan time.Duration) *AlertDetector {
+	m := NewMonitor()
+	zero := uint64(0)
+	testTick := time.NewTicker(2 * time.Second)
+
+	ad := &AlertDetector{
+		ctx:        ctx,
+		upperLimit: alertThreshold,
+		testSpan:   timeSpan,
+		testTicker: testTick,
+		monitor:    m,
+		localInc:   &zero,
+		flush:      time.NewTicker(2 * time.Second),
+
+		notify:     notification,
+		startState: state,
+		getState:   make(chan struct{}, 1),
+	}
+	go ad.flushIncrements()
+	go ad.runState()
 	return ad
 }
 
@@ -104,15 +122,9 @@ func (a *AlertDetector) Increment(inc int, now time.Time) {
 
 // GetState informs caller of AlertDetector's current state.
 func (a *AlertDetector) GetState() Notification {
-	switch reflect.ValueOf(a.activeState).Pointer() {
-	case reflect.ValueOf(Nominal).Pointer():
-		return NominalStatus{ts: time.Now()}
-	case reflect.ValueOf(Alerted).Pointer():
-		v := a.monitor.RecentSum(a.testSpan)
-		return Alert{ts: time.Now(), hits: v}
-	default:
-		return NilStatus{}
-	}
+	a.getState <- struct{}{}
+	status := <-a.notify
+	return status
 }
 
 func (a *AlertDetector) flushIncrements() {
@@ -133,8 +145,9 @@ func (a *AlertDetector) flushIncrements() {
 
 // runState operates the alert state transition logic.
 func (a *AlertDetector) runState() {
-	for a.activeState != nil {
-		a.activeState = a.activeState(a)
+	state := a.startState
+	for state != nil {
+		state = state(a)
 	}
 }
 
@@ -147,6 +160,8 @@ func Nominal(a *AlertDetector) StateFunc {
 		select {
 		case <-a.ctx.Done():
 			return nil
+		case <-a.getState:
+			a.notify <- NominalStatus{ts: time.Now()}
 		case now := <-a.testTicker.C:
 			v := a.monitor.RecentSum(a.testSpan)
 			if v > a.upperLimit { // Alerting threshold triggered
@@ -166,6 +181,9 @@ func Alerted(a *AlertDetector) StateFunc {
 		select {
 		case <-a.ctx.Done():
 			return nil
+		case <-a.getState:
+			v := a.monitor.RecentSum(a.testSpan)
+			a.notify <- Alert{ts: time.Now(), hits: v}
 		case now := <-a.testTicker.C:
 			v := a.monitor.RecentSum(a.testSpan)
 			if v < a.upperLimit {
