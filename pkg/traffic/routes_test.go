@@ -53,7 +53,6 @@ func TestZeroValues(t *testing.T) {
 				//fmt.Println("inserted:", i)
 			}
 			close(work)
-			fmt.Println("work submitted to pool")
 			wg.Wait()
 
 			if kc.Get() != uint64(test.i) {
@@ -115,7 +114,6 @@ func TestConcurrentKeyMap(t *testing.T) {
 					}
 				}
 			}
-			fmt.Println("work submitted to group")
 			close(work)
 			wg.Wait()
 
