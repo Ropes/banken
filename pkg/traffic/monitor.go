@@ -7,18 +7,6 @@ import (
 	"github.com/ropes/banken/pkg/traffic/internal/timeseries"
 )
 
-type staticClock struct {
-	t time.Time
-}
-
-func newStaticClock(t time.Time) *staticClock {
-	return &staticClock{t: t}
-}
-
-func (c *staticClock) Time() time.Time {
-	return c.t
-}
-
 type nowClock struct{}
 
 func (c *nowClock) Time() time.Time {
@@ -45,13 +33,6 @@ func NewMonitor(t time.Time) *Monitor {
 	}
 }
 
-func newTestMonitor(t time.Time) *Monitor {
-	c := newStaticClock(t)
-	return &Monitor{
-		tsdb: timeseries.NewTimeSeriesWithClock(timeseries.NewFloat, c),
-	}
-}
-
 // Increment the count by i for given clock time.
 func (tm *Monitor) Increment(i int, clock time.Time) {
 	f := new(timeseries.Float)
@@ -64,18 +45,18 @@ func (tm *Monitor) Increment(i int, clock time.Time) {
 
 // RangeSum aggregates the occurrences within the delta duration parameter.
 func (tm *Monitor) RangeSum(start, finish time.Time) int {
-	tm.tsMux.RLock()
+	tm.tsMux.Lock()
 	obs := tm.tsdb.Range(start, finish)
-	tm.tsMux.RUnlock()
+	tm.tsMux.Unlock()
 	f := obs.(*timeseries.Float)
 	return int(*f)
 }
 
 // RecentSum aggregates the occurrences within the delta duration parameter.
 func (tm *Monitor) RecentSum(delta time.Duration) int {
-	tm.tsMux.RLock()
+	tm.tsMux.Lock()
 	obs := tm.tsdb.Recent(delta)
-	tm.tsMux.RUnlock()
+	tm.tsMux.Unlock()
 	f := obs.(*timeseries.Float)
 	return int(*f)
 }

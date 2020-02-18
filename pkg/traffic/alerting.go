@@ -89,9 +89,10 @@ func NewAlertDetector(ctx context.Context, now time.Time, alertThreshold int, no
 	return ad
 }
 
+// TODO: Remove
 func newTestAlertDetector(ctx context.Context, now time.Time, alertThreshold int, notification chan Notification) *AlertDetector {
 	ad := NewAlertDetector(ctx, now, alertThreshold, notification)
-	ad.monitor = newTestMonitor(now)
+	ad.monitor = NewMonitor(now)
 	return ad
 }
 

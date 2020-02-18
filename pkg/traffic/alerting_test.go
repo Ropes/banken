@@ -51,7 +51,9 @@ func TestBasicAlert(t *testing.T) {
 	step := start.Add(1 * time.Minute)
 	notify := make(chan Notification, 1)
 
-	ad := newTestAlertDetector(ctx, start, 10, notify)
+	//ad := newTestAlertDetector(ctx, start.Add(2*time.Minute), 10, notify)
+	ad := NewAlertDetector(ctx, start, 10, notify)
+	ad.testSpan = 1 * time.Minute
 	// Assert state is nominal
 	state := ad.GetState()
 	if reflect.TypeOf(state) != reflect.TypeOf(NominalStatus{}) {
@@ -76,9 +78,25 @@ func TestBasicAlert(t *testing.T) {
 	default:
 		t.Errorf("notification should be an alert: %v", expNotification)
 	}
+}
 
+func TestExitAlertStatus(t *testing.T) {
+	ctx := context.Background()
+	start := time.Now()
+	notify := make(chan Notification, 1)
+
+	//ad := newTestAlertDetector(ctx, start.Add(2*time.Minute), 10, notify)
+	ad := NewAlertDetector(ctx, start, 10, notify)
 	ad.testSpan = 1 * time.Minute
-	expNotification = <-notify
+	ad.activeState = Alerted // Set test state to Alerted
+
+	// Assert state is Alerted
+	state := ad.GetState()
+	if reflect.TypeOf(state) != reflect.TypeOf(Alert{}) {
+		t.Errorf("types did not match: %v", reflect.TypeOf(state))
+	}
+
+	expNotification := <-notify
 	switch expNotification.(type) {
 	case NominalStatus:
 		t.Logf("expected NominalStatus returned: %v", expNotification)
