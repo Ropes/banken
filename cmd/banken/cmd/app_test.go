@@ -37,16 +37,18 @@ func TestRequests(t *testing.T) {
 	l.SetOutput(os.Stderr)
 	b := NewBanken(ctx, 10, 10, "", l)
 
-	ifaces, reqs, err := b.Init()
+	ifaces, reqs, err := b.Init(nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Launch interface listener
 	go func() {
 		b.Run(ifaces, reqs)
 	}()
 	time.Sleep(100 * time.Millisecond)
 
+	// Make 5 http requests
 	for i := 0; i < 5; i++ {
 		resp, err := http.Get("http://localhost:8081/")
 		if err != nil {
@@ -56,7 +58,7 @@ func TestRequests(t *testing.T) {
 			t.Fatal("status != 200")
 		}
 	}
-	l.Info("getting first alert status")
+	l.Info("Asserting first AlertDetector state is nominal")
 	status := b.getAlertState()
 	if reflect.TypeOf(status) != reflect.TypeOf(traffic.NominalStatus{}) {
 		t.Errorf("status is not nominal: %v", status)
@@ -75,10 +77,17 @@ func TestRequests(t *testing.T) {
 		}()
 	}
 	time.Sleep(5 * time.Second)
-	l.Info("post 500req alert status")
+	l.Info("test AlertDetector state post 500 requests")
 	status = b.getAlertState()
 	if reflect.TypeOf(status) != reflect.TypeOf(traffic.Alert{}) {
 		t.Errorf("status is not alerted: %v", status)
 	}
 
+	// Assert that the request count is accurate
+	now := time.Now()
+	start := now.Add(-5 * time.Minute)
+	s := b.ad.GetSpanCount(start, now)
+	if s < 505 {
+		t.Errorf("timeseries span of [%v-%v] was below expected value: %d", start, now, s)
+	}
 }
