@@ -24,7 +24,7 @@ type Alert struct {
 
 // Alert formats state of alert to caller.
 func (a Alert) String() string {
-	return fmt.Sprintf("High traffic generated an alert - hits = %d, triggered at %v", a.hits, a.ts)
+	return fmt.Sprintf("High traffic generated an alert --- hits = %d, triggered at %s", a.hits, a.ts.Format(time.RFC3339))
 }
 
 // NominalStatus indicates normal HTTP request rate conditions.
@@ -34,7 +34,7 @@ type NominalStatus struct {
 
 // String formats state information to watcher.
 func (s NominalStatus) String() string {
-	return fmt.Sprintf("Traffic within nominal parameters - time: %v", s.ts)
+	return fmt.Sprintf("Traffic within nominal parameters - time: %s", s.ts.Format(time.RFC3339))
 }
 
 // NilStatus informs caller that AlertDetector state has exited operation.

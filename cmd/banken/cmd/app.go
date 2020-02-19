@@ -28,11 +28,12 @@ func detectInterfaces() ([]string, error) {
 	return output, nil
 }
 
-// Banken 番犬　App
+// Banken 番犬　App manages launching cosumers of network traffic data
+// as well as the data storage structures. After startup it operates updating
+// the UI data structures from the models.
 type Banken struct {
-	ctx         context.Context
-	logger      *log.Logger
-	debugLogger *log.Logger
+	ctx    context.Context
+	logger *log.Logger
 
 	at   int
 	topN int
@@ -43,14 +44,15 @@ type Banken struct {
 	status traffic.Notification
 }
 
+// NewBanken initiates instance with at:AlertThreshold, topN: Top N(umber) of
+// URLs to display, and bpf (filter) string to configure packet capture.
 func NewBanken(ctx context.Context, at, topN int, bpf string, logger *log.Logger) *Banken {
 	dl := log.New()
 	dl.SetOutput(os.Stderr)
 
 	return &Banken{
-		ctx:         ctx,
-		logger:      logger,
-		debugLogger: dl,
+		ctx:    ctx,
+		logger: logger,
 
 		at:   at,
 		topN: topN,
@@ -58,6 +60,8 @@ func NewBanken(ctx context.Context, at, topN int, bpf string, logger *log.Logger
 	}
 }
 
+// Init launches all consumers of the collected packet data models, then logs
+// and updates the UI with http traffic status.
 func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff.HTTPXPacket, error) {
 	// Detect interfaces
 	ifaces, err := detectInterfaces()
@@ -73,7 +77,7 @@ func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff
 		i := 0
 		for n := range notifications {
 			i++
-			logger.Infof("RequestRate Notification: %q", n.String())
+			logger.Infof("RequestRate Notification: %s", n.String())
 			if alerts != nil {
 				alerts.Rows = append(alerts.Rows, fmt.Sprintf("[%d] %s", i, n.String()))
 				ui.Render(alerts)
@@ -174,8 +178,8 @@ func (b *Banken) Run(ifaces []string, packetStream chan sniff.HTTPXPacket) {
 	bpfFilter := viper.GetString("bpf")
 	for _, iface := range ifaces {
 		go func(iface string) {
-			ctxLogger := b.debugLogger.WithFields(log.Fields{"iface": iface})
-			b.debugLogger.Debugf("BPF: %q", b.bpf)
+			ctxLogger := b.logger.WithFields(log.Fields{"iface": iface})
+			b.logger.Debugf("BPF: %q", b.bpf)
 			sniff.InterfaceListener(ctx, packetStream, iface, bpfFilter, 1600, ctxLogger.Logger)
 		}(iface)
 	}
