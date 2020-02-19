@@ -74,30 +74,76 @@ func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff
 		for n := range notifications {
 			i++
 			logger.Infof("RequestRate Notification: %q", n.String())
-			alerts.Rows = append(alerts.Rows, fmt.Sprintf("[%d] %s", i, n.String()))
-			ui.Render(alerts)
+			if alerts != nil {
+				alerts.Rows = append(alerts.Rows, fmt.Sprintf("[%d] %s", i, n.String()))
+				ui.Render(alerts)
+			}
 		}
 	}(b.ad, b.logger)
 
 	// Initialize Route Counter
 	b.rc = new(traffic.RequestCounter)
 	rcTick := time.NewTicker(5 * time.Second)
+	intervals := []struct {
+		s string
+		t time.Duration
+	}{
+		{
+			s: "1m",
+			t: 1 * time.Minute,
+		},
+		{
+			s: "5m",
+			t: 5 * time.Minute,
+		},
+		{
+			s: "15m",
+			t: 15 * time.Minute,
+		},
+		{
+			s: "30m",
+			t: 30 * time.Minute,
+		},
+		{
+			s: "60m",
+			t: 60 * time.Minute,
+		},
+		{
+			s: "24hr",
+			t: 24 * time.Hour,
+		},
+	}
 	go func() {
 		for range rcTick.C {
 			m := b.rc.Export()
 			f := log.Fields{}
 			reqs := topNRequests(m, b.topN)
-			top := make([]string, b.topN)
+			top := make([]string, 0)
 			for i, v := range reqs {
 				s := fmt.Sprintf("%s -> %d", v.URL, v.C)
 				f[fmt.Sprintf("%d", i+1)] = s
 				top = append(top, fmt.Sprintf("[%d]: %s", i+1, s))
 			}
-			topN.Rows = top
 			b.logger.WithFields(f).Infof("Top %d URLs", b.topN)
 
-			ui.Render(topN)
-			ui.Render(reqCnts)
+			counts := make([]string, 0)
+			for _, i := range intervals {
+				now := time.Now()
+				c := b.ad.GetSpanCount(now.Add(-i.t), now)
+				if c > 0 {
+					counts = append(counts, fmt.Sprintf("%s: %d", i.s, c))
+				}
+			}
+
+			if topN != nil && reqCnts != nil {
+				if len(top) == 0 {
+					top = []string{"waiting for http traffic..."}
+				}
+				topN.Rows = top
+				ui.Render(topN)
+				reqCnts.Rows = counts
+				ui.Render(reqCnts)
+			}
 		}
 	}()
 

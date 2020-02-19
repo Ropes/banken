@@ -49,16 +49,17 @@ Guard dog application for monitoring HTTP traffic on local interfaces.
 * UI: ???
     * 1: Normal shell output with specified information dumps.
 
-## TODO Improvements
-
+## Improvements to make
+* More integration tests. 
+    * `make go-test-banken` does execute a test against actual interfaces.
 * Monitor HTTPS data flows and record traffic bandwidth per source.
     * Record bytes traversed per source/dest.
 * Smarter [anomaly detection](https://github.com/lytics/anomalyzer), which could take into acount average usage but still detect large spikes.
+* TermUI resizes nicely after launch(Currently does not).
 * Use [termui](https://github.com/gizak/termui) for a clean updating interface.
     * Mix of the two possible with anomaly recordings streaming up and lower section containing the stats box/window?
 
 ## Acknowledgements
 
 * Hoisted source code from package of the still experimental [golang.org/x/net/internal/timseries](https://pkg.go.dev/golang.org/x/net@v0.0.0-20200202094626-16171245cfb2/internal/timeseries?tab=doc) package to manage data. The package used by `x/net/trace` for compiling traffic statistics, and provides minute-hour granularity bucketing, and automatic downsampling.
-
-
+* [TermUI](https://github.com/gizak/termui)
