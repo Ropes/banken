@@ -56,7 +56,8 @@ var monitor = &cobra.Command{
 
 	HTTP request URL paths are truncated to their first section. eg: 'http://man7.org/linux/man-pages/man1/intro.1.html' is truncated and counted as 'http://man7.org/linux'. A URL to file on first path variable gets counted as a root request. eg: 'http://man7.org/style.css' will be counted to increment 'http://man7.org/'.
 
-	If enabled by --log-sink and --log-level, logs are written periodically recording all of the information rendered in the terminal UI.
+	If enabled by --log-sink and --log-level, logs are written periodically recording all of the information rendered in the terminal UI. Set --log-sink to empty string, to flush logs into
+	/dev/null.
 
 	Using Berkley Packet Filtering; by default only port 80 is monitored for HTTP packets. However that can be configured by supplying a different BPF via --bpf.
 
@@ -98,7 +99,9 @@ func logSetup() *log.Logger {
 	if logSink != "" {
 		var lf *os.File
 		var err error
+		// stdout is used by termui, so can't log there
 		if logSink == "stderr" {
+			// stderr can be redirected with 2>>/tmp/logfile
 			lf = os.Stderr
 		} else {
 			lf, err = os.OpenFile(logSink, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -108,7 +111,11 @@ func logSetup() *log.Logger {
 		}
 		logger.SetOutput(lf)
 	} else {
-		logger.SetOutput(os.Stdout)
+		dn, err := os.OpenFile(os.DevNull, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			logger.Fatalf("unable to open %q for logging", os.DevNull)
+		}
+		logger.SetOutput(dn)
 	}
 	return logger
 }

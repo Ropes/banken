@@ -25,7 +25,8 @@ Banken 番犬(watchdog) monitors HTTP network traffic from local interfaces and
     increment 'http://man7.org/'.
 
 	If enabled by --log-sink and --log-level, logs are written periodically 
-    recording all of the information rendered in the terminal UI.
+    recording all of the information rendered in the terminal UI. Set --log-sink 
+    to empty string "", to flush unwanted logs into /dev/null.
 
 	Using Berkley Packet Filtering; by default only port 80 is monitored for
     HTTP packets. However that can be configured by supplying a different BPF via --bpf.
