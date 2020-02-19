@@ -13,6 +13,9 @@ import (
 
 // Init constructs termui UI data structures and returns them so data
 // controllers can update the UI.
+//
+// UI will attempt to scale based on the given Terminal dimensions, but
+// it will not update dimensions if the window is changed after startup.
 func Init(ctx context.Context, n int) (topN, reqCnts, alerts *widgets.List) {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -122,8 +125,8 @@ func Run(can context.CancelFunc, topN, reqCnts, alerts *widgets.List) {
 			previousKey = e.ID
 		}
 
+		ui.Render(alerts)
 		ui.Render(topN)
 		ui.Render(reqCnts)
-		ui.Render(alerts)
 	}
 }

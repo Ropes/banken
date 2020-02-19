@@ -30,6 +30,7 @@ func HTTPURLSlug(domain, path string) string {
 	return u.String()
 }
 
+// ReqCount links URLs to their request occurrence count:C.
 type ReqCount struct {
 	URL string
 	C   uint64

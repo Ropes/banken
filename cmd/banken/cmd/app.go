@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Banken 番犬　App manages launching cosumers of network traffic data
+// Banken 番犬　App manages launching consumers of network traffic data
 // as well as the data storage structures. After startup it operates updating
 // the UI data structures from the models.
 type Banken struct {
@@ -59,7 +59,7 @@ func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff
 
 	// Initialize Traffic Monitor alerter
 	notifications := make(chan traffic.Notification, 1)
-	b.ad = traffic.NewAlertDetector(b.ctx, time.Now(), 5, notifications)
+	b.ad = traffic.NewAlertDetector(b.ctx, time.Now(), b.at, notifications)
 	go func(a *traffic.AlertDetector, logger *log.Logger) {
 		i := 0
 		for n := range notifications {

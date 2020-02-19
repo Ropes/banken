@@ -33,30 +33,37 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&logLevel, flagLogLevel, "l", "info", "log verbosity level")
 	rootCmd.PersistentFlags().StringVarP(&logSink, flagLogSink, "s", "/tmp/banken.log", "logging destination, leave blank to disable")
 
-	monitor.PersistentFlags().StringVarP(&bpf, flagBPF, "b", "tcp port 80 or port 443", "BPF configuration string")
-	monitor.PersistentFlags().IntVarP(&alertThreshold, flagAlertThresh, "a", 100, "alerting threshold of http requests per 2 minute span ")
+	monitor.PersistentFlags().StringVarP(&bpf, flagBPF, "b", "tcp port 80", "BPF configuration string")
+	monitor.PersistentFlags().IntVarP(&alertThreshold, flagAlertThresh, "a", 10, "alerting threshold of http requests per 2 minute span ")
 	monitor.PersistentFlags().IntVarP(&topNReqs, flagTopReqs, "t", 10, "top number of URL:RequestCounts to display")
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "banken",
-	Short: "番犬(watchdog) HTTP traffic monitor for unix systems",
-	Long: `番犬(watchdog) HTTP traffic monitor for unix systems.
-
-	Utilizes LibPCAP to read network traffic from local interfaces and parse HTTP requests.
+	Short: "Banken 番犬(watchdog) HTTP traffic monitor for unix systems",
+	Long: `Banken 番犬(watchdog) is a network traffic diagnostic tool. 
 	
+	Monitors HTTP traffic for unix systems, utilizing libpcap to read network traffic from local interfaces and parse HTTP requests(currently).
 	`,
 }
 
 var monitor = &cobra.Command{
 	Use:   "monitor",
 	Short: "Monitor http traffic request destinations, counts, and notify when requests exceed alert threshold.",
-	Long: `Utilizes LibPCAP to read network traffic from local interfaces and parse HTTP requests.
+	Long: `Banken 番犬(watchdog) monitors HTTP network traffic from local interfaces and analyses request sources and throughput. 
+	
+	Terminal UI provides statistics on traffic counts over time, and top -t (default 10) URLs requested, to the first /section/. Alerts when the HTTP traffic rate surpasses the --alert-threshold per 2 minute timespan.
 
-	 
+	HTTP request URL paths are truncated to their first section. eg: 'http://man7.org/linux/man-pages/man1/intro.1.html' is truncated and counted as 'http://man7.org/linux'. A URL to file on first path variable gets counted as a root request. eg: 'http://man7.org/style.css' will be counted to increment 'http://man7.org/'.
+
+	If enabled by --log-sink and --log-level, logs are written periodically recording all of the information rendered in the terminal UI.
+
+	Using Berkley Packet Filtering; by default only port 80 is monitored for HTTP packets. However that can be configured by supplying a different BPF via --bpf.
+
+	Press 'q' to exit.
 	`,
 	Run: func(cobraCmd *cobra.Command, args []string) {
-		logger := configuration()
+		logger := logSetup()
 
 		// Catch shutdown signals
 		runCtx, can := context.WithCancel(context.Background())
@@ -80,7 +87,7 @@ var monitor = &cobra.Command{
 	},
 }
 
-func configuration() *log.Logger {
+func logSetup() *log.Logger {
 	// Initialize Logging
 	logLevelVal, err := log.ParseLevel(logLevel)
 	logger := log.New()
@@ -99,7 +106,7 @@ func configuration() *log.Logger {
 				logger.Fatalf("unable to open %q for logging", logSink)
 			}
 		}
-		defer lf.Close()
+		logger.SetOutput(lf)
 	} else {
 		logger.SetOutput(os.Stdout)
 	}
