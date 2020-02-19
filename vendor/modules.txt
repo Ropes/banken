@@ -1,5 +1,9 @@
 # github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
+# github.com/gizak/termui/v3 v3.1.0
+github.com/gizak/termui/v3
+github.com/gizak/termui/v3/drawille
+github.com/gizak/termui/v3/widgets
 # github.com/google/gopacket v1.1.17
 github.com/google/gopacket
 github.com/google/gopacket/layers
@@ -23,8 +27,14 @@ github.com/inconshreveable/mousetrap
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
+# github.com/mattn/go-runewidth v0.0.2
+github.com/mattn/go-runewidth
+# github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7
+github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
+# github.com/nsf/termbox-go v0.0.0-20190121233118-02980233997d
+github.com/nsf/termbox-go
 # github.com/pelletier/go-toml v1.2.0
 github.com/pelletier/go-toml
 # github.com/sirupsen/logrus v1.4.2
