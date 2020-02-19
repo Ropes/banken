@@ -17,12 +17,12 @@ func TestHTTPSlug(t *testing.T) {
 			expPath: "/ski",
 		},
 		{
-			path:    "/ski",
-			expPath: "/ski",
+			path:    "/ski.jpg",
+			expPath: "/",
 		},
 		{
 			path:    "//",
-			expPath: "",
+			expPath: "/",
 		},
 	}
 
@@ -30,8 +30,9 @@ func TestHTTPSlug(t *testing.T) {
 		out := HTTPURLSlug(domain, test.path)
 		exp := "http://" + domain + test.expPath
 		if exp != out {
-			t.Errorf("incorrect path returned: %q, exp: %q", out, exp)
+			t.Errorf("incorrect path returned for %q: returned: %q, exp: %q", test.path, out, exp)
 		}
+		t.Logf("%q", out)
 	}
 
 }
