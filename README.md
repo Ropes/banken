@@ -1,7 +1,7 @@
 [番犬](https://jisho.org/word/%E7%95%AA%E7%8A%AC)
 ------
 
-'Guard dog' application for monitoring HTTP traffic on local interfaces. Fun project to dig back into concurrency for potentially high load data streams. Learned some new libraries, refreshed some Go concurrency patterns, and regained appreciation of the test -race detector! Certainly could have been implemented with simpler data structures, but adding the UI later was easier thanks to component composition.
+'Guard dog' application for monitoring HTTP traffic on local interfaces. 
 
 ![Running with shortened alert timespan](https://user-images.githubusercontent.com/489062/74881612-7d09a900-5322-11ea-9742-44e7fe98937d.png)
 
@@ -11,15 +11,24 @@
 
 ```
 ./banken monitor -h
-Banken 番犬(watchdog) monitors HTTP network traffic from local interfaces and analyses request sources and throughput. 
+Banken 番犬(watchdog) monitors HTTP network traffic from local interfaces and
+ analyses request sources and throughput. 
 	
-	Terminal UI provides statistics on traffic counts over time, and top -t (default 10) URLs requested, to the first /section/. Alerts when the HTTP traffic rate surpasses the --alert-threshold per 2 minute timespan.
+	Terminal UI provides statistics on traffic counts over time, and top -t 
+    (default 10) URLs requested, to the first /section/. Alerts when the HTTP
+    traffic rate surpasses the --alert-threshold per 2 minute timespan.
 
-	HTTP request URL paths are truncated to their first section. eg: 'http://man7.org/linux/man-pages/man1/intro.1.html' is truncated and counted as 'http://man7.org/linux'. A URL to file on first path variable gets counted as a root request. eg: 'http://man7.org/style.css' will be counted to increment 'http://man7.org/'.
+	HTTP request URL paths are truncated to their first section. eg: 
+    'http://man7.org/linux/man-pages/man1/intro.1.html' is truncated and counted
+    as 'http://man7.org/linux'. A URL to file on first path variable gets counted
+    as a root request. eg: 'http://man7.org/style.css' will be counted to
+    increment 'http://man7.org/'.
 
-	If enabled by --log-sink and --log-level, logs are written periodically recording all of the information rendered in the terminal UI.
+	If enabled by --log-sink and --log-level, logs are written periodically 
+    recording all of the information rendered in the terminal UI.
 
-	Using Berkley Packet Filtering; by default only port 80 is monitored for HTTP packets. However that can be configured by supplying a different BPF via --bpf.
+	Using Berkley Packet Filtering; by default only port 80 is monitored for
+    HTTP packets. However that can be configured by supplying a different BPF via --bpf.
 
 	Press 'q' to exit.
 
@@ -39,6 +48,8 @@ Global Flags:
 
 
 ## Building
+
+`go mod` does complain a little bit about some of `termui`'s dependencies. However imported code has been vendored, so building should work if you have a modern version of Go and libpcap headers installed.
 
 ### Requirements
 
@@ -64,6 +75,8 @@ All building and testing was done on a Linux machine. However it should be able 
 * Find something else? D: Submit an [issue](https://github.com/Ropes/banken/issues/new)!
 
 ## Implementation Design
+
+This was a fun project to dig back into concurrency for potentially high load data streams. Learned some new libraries, refreshed some Go concurrency patterns, and regained appreciation of the test -race detector! Certainly could have been implemented with simpler data structures, but adding the UI later was easier thanks to component composition.
 
 * Intercept traffic constrained by BPF from the local interfaces.
 * Filter traffic down to only HTTP requests.
