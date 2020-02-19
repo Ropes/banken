@@ -83,8 +83,6 @@ func (h *httpXStream) run() {
 					Tracef("http.ReadRequest error reading packet")
 			} else if req != nil {
 				// HTTP data was read into request
-				h.logger.WithFields(log.Fields{"host": req.Host, "path": req.URL.Path, "method": req.Method,
-					"transport": h.transport, "net": h.net, "time": time.Now()}).Info("httpX packet read")
 				// Create HTTPXPacket to return to processors.
 				hp := HTTPXPacket{
 					TS:       time.Now(),

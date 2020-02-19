@@ -18,7 +18,7 @@ func (c *nowClock) Time() time.Time {
 //so all calls to it are wrapped in a mutex.
 type Monitor struct {
 	tsdb  *timeseries.TimeSeries
-	tsMux sync.RWMutex
+	tsMux sync.Mutex
 }
 
 // NewMonitor initializes the data type with clock and NewFloat observable

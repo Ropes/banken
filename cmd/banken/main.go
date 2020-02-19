@@ -2,15 +2,11 @@ package main
 
 import (
 	"context"
-	"net"
 	"os"
 	"os/signal"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/ropes/banken/cmd/banken/cmd"
-	"github.com/ropes/banken/pkg/sniff"
-	"github.com/ropes/banken/pkg/traffic"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -83,18 +79,6 @@ func catchCancelSignal(can context.CancelFunc, sig ...os.Signal) {
 	}()
 }
 
-func detectInterfaces() ([]string, error) {
-	output := make([]string, 0)
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-	for _, i := range ifaces {
-		output = append(output, i.Name)
-	}
-	return output, nil
-}
-
 func main() {
 	logger := configuration()
 
@@ -103,62 +87,13 @@ func main() {
 	catchCancelSignal(can, unix.SIGINT, unix.SIGHUP, unix.SIGTERM, unix.SIGQUIT)
 	defer can()
 
-	// Initialize command
-	// Detect interfaces
-	ifaces, err := detectInterfaces()
+	banken := cmd.NewBanken(runCtx, logger)
+
+	ifaces, packets, err := banken.Init()
 	if err != nil {
+		can()
 		logger.Fatal(err)
 	}
 
-	// Initialize Traffic Monitor alerter
-	notifications := make(chan traffic.Notification, 1)
-	ad := traffic.NewAlertDetector(runCtx, time.Now(), 5, notifications)
-	go func(a *traffic.AlertDetector, logger *log.Logger) {
-		for n := range notifications {
-			logger.Infof("Alert Notification: %q", n.String())
-		}
-	}(ad, logger)
-
-	// Initialize Route Counter
-	rc := new(traffic.RequestCounter)
-	rcTick := time.NewTicker(10 * time.Second)
-	go func() {
-		for range rcTick.C {
-			m := rc.Export()
-			logger.Infof("Common URLs")
-			for k, v := range m {
-				logger.Infof("%v %d", k, v)
-			}
-
-		}
-	}()
-
-	// Initialize sniffer
-	bpfFlag := viper.GetString("bpf")
-	const consumers = 5
-	packetStream := make(chan sniff.HTTPXPacket, consumers)
-	// Initialze stream consumers before reading packets
-	for i := 0; i < consumers; i++ {
-		go func() {
-			for p := range packetStream {
-				// Increment traffic counter
-				ad.Increment(1, time.Now())
-
-				// Record the URL's route to counter
-				u := cmd.HTTPURLSlug(p.Host, p.Path)
-				log.Infof("PacketConsumer received: %v", u)
-				rc.IncKey(u, uint64(1))
-			}
-		}()
-	}
-
-	for _, iface := range ifaces {
-		go func(iface string) {
-			ctxLogger := logger.WithFields(log.Fields{"iface": iface})
-			sniff.InterfaceListener(runCtx, packetStream, iface, bpfFlag, 1600, ctxLogger.Logger)
-		}(iface)
-	}
-
-	// Wait for stop signal
-	<-runCtx.Done()
+	banken.Run(ifaces, packets)
 }
