@@ -26,6 +26,7 @@ var (
 	logSink        *string
 	alertThreshold *int
 )
+
 var rootCmd = &cobra.Command{
 	Use:   "banken",
 	Short: "http traffic monitor for unix systems",
@@ -85,6 +86,8 @@ type Banken struct {
 	logger      *log.Logger
 	debugLogger *log.Logger
 
+	rc     *traffic.RequestCounter
+	ad     *traffic.AlertDetector
 	status traffic.Notification
 }
 
@@ -106,19 +109,19 @@ func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
 
 	// Initialize Traffic Monitor alerter
 	notifications := make(chan traffic.Notification, 1)
-	ad := traffic.NewAlertDetector(b.ctx, time.Now(), 5, notifications)
+	b.ad = traffic.NewAlertDetector(b.ctx, time.Now(), 5, notifications)
 	go func(a *traffic.AlertDetector, logger *log.Logger) {
 		for n := range notifications {
 			logger.Infof("Alert Notification: %q", n.String())
 		}
-	}(ad, b.logger)
+	}(b.ad, b.logger)
 
 	// Initialize Route Counter
-	rc := new(traffic.RequestCounter)
+	b.rc = new(traffic.RequestCounter)
 	rcTick := time.NewTicker(10 * time.Second)
 	go func() {
 		for range rcTick.C {
-			m := rc.Export()
+			m := b.rc.Export()
 			b.debugLogger.Infof("Common URLs")
 			for k, v := range m {
 				b.logger.Infof("%v %d", k, v)
@@ -135,12 +138,12 @@ func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
 		go func() {
 			for p := range packetStream {
 				// Increment traffic counter
-				ad.Increment(1, p.TS)
+				b.ad.Increment(1, p.TS)
 
 				// Record the URL's route to counter
 				u := HTTPURLSlug(p.Host, p.Path)
 				log.Tracef("PacketConsumer received: %v", u)
-				rc.IncKey(u, uint64(1))
+				b.rc.IncKey(u, uint64(1))
 			}
 		}()
 	}
@@ -161,4 +164,16 @@ func (b *Banken) Run(ifaces []string, packetStream chan sniff.HTTPXPacket) {
 
 	// Wait for stop signal
 	<-ctx.Done()
+}
+
+func (b *Banken) getAlertState() traffic.Notification {
+	return b.ad.GetState()
+}
+
+func (b *Banken) tsReqSpanCount(start, end time.Time) int {
+	return b.ad.GetSpanCount(start, end)
+}
+
+func (b *Banken) countMap() map[string]uint64 {
+	return b.rc.Export()
 }

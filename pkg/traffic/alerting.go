@@ -16,7 +16,7 @@ type Notification interface {
 	String() string
 }
 
-// Alert caller to request limit breach.
+// Alert indicates that HTTP request rate surpassed the limit.
 type Alert struct {
 	hits int
 	ts   time.Time
@@ -27,7 +27,7 @@ func (a Alert) String() string {
 	return fmt.Sprintf("High traffic generated an alert - hits = %d, triggered at %v", a.hits, a.ts)
 }
 
-// NominalStatus returned to caller.
+// NominalStatus indicates normal HTTP request rate conditions.
 type NominalStatus struct {
 	ts time.Time
 }
@@ -63,7 +63,8 @@ type AlertDetector struct {
 	flush    *time.Ticker
 
 	startState StateFunc
-	getState   chan struct{}
+	reqState   chan struct{}
+	getState   chan Notification
 }
 
 // NewAlertDetector initializes alerting of events when
@@ -83,7 +84,8 @@ func NewAlertDetector(ctx context.Context, now time.Time, alertThreshold int, no
 
 		notify:     notification,
 		startState: Nominal,
-		getState:   make(chan struct{}, 1),
+		getState:   make(chan Notification, 1),
+		reqState:   make(chan struct{}, 1),
 	}
 	go ad.flushIncrements()
 	go ad.runState()
@@ -107,7 +109,8 @@ func newTestAlertDetector(ctx context.Context, alertThreshold int, notification 
 
 		notify:     notification,
 		startState: state,
-		getState:   make(chan struct{}, 1),
+		reqState:   make(chan struct{}, 1),
+		getState:   make(chan Notification, 1),
 	}
 	go ad.flushIncrements()
 	go ad.runState()
@@ -120,11 +123,19 @@ func (a *AlertDetector) Increment(inc int, now time.Time) {
 	atomic.AddUint64(a.localInc, uint64(inc))
 }
 
-// GetState informs caller of AlertDetector's current state.
+// GetState informs caller of AlertDetector's current operation state.
+// Channels are used to request and return Alert state to protect
+// external mutation of the state value itself.
 func (a *AlertDetector) GetState() Notification {
-	a.getState <- struct{}{}
-	status := <-a.notify
+	a.reqState <- struct{}{}
+	status := <-a.getState
 	return status
+}
+
+// GetSpanCount provides access to the occurrence count within a sepcified
+// time interval[start, end].
+func (a *AlertDetector) GetSpanCount(start, end time.Time) int {
+	return a.monitor.RangeSum(start, end)
 }
 
 func (a *AlertDetector) flushIncrements() {
@@ -160,8 +171,8 @@ func Nominal(a *AlertDetector) StateFunc {
 		select {
 		case <-a.ctx.Done():
 			return nil
-		case <-a.getState:
-			a.notify <- NominalStatus{ts: time.Now()}
+		case <-a.reqState:
+			a.getState <- NominalStatus{ts: time.Now()}
 		case now := <-a.testTicker.C:
 			v := a.monitor.RecentSum(a.testSpan)
 			if v > a.upperLimit { // Alerting threshold triggered
@@ -181,9 +192,9 @@ func Alerted(a *AlertDetector) StateFunc {
 		select {
 		case <-a.ctx.Done():
 			return nil
-		case <-a.getState:
+		case <-a.reqState:
 			v := a.monitor.RecentSum(a.testSpan)
-			a.notify <- Alert{ts: time.Now(), hits: v}
+			a.getState <- Alert{ts: time.Now(), hits: v}
 		case now := <-a.testTicker.C:
 			v := a.monitor.RecentSum(a.testSpan)
 			if v < a.upperLimit {
