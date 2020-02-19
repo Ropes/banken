@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -27,4 +28,24 @@ func HTTPURLSlug(domain, path string) string {
 		Path:   p,
 	}
 	return u.String()
+}
+
+type ReqCount struct {
+	URL string
+	C   uint64
+}
+
+func topNRequests(m map[string]uint64, n int) []ReqCount {
+	reqs := make([]ReqCount, 0)
+	for k, v := range m {
+		reqs = append(reqs, ReqCount{URL: k, C: v})
+	}
+	sort.Slice(reqs, func(i, j int) bool {
+		return reqs[i].C > reqs[j].C
+	})
+	// Cap the length of returned data.
+	if len(reqs) > n {
+		reqs = reqs[:n]
+	}
+	return reqs
 }
