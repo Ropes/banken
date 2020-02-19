@@ -3,7 +3,39 @@
 
 'Guard dog' application for monitoring HTTP traffic on local interfaces. Fun project to dig back into concurrency for potentially high load data streams.
 
+![Running with shortened alert timespan](https://user-images.githubusercontent.com/489062/74881612-7d09a900-5322-11ea-9742-44e7fe98937d.png)
+
 ## Running
+
+`banken monitor` to launch the service!
+
+```
+./banken monitor -h
+Banken 番犬(watchdog) monitors HTTP network traffic from local interfaces and analyses request sources and throughput. 
+	
+	Terminal UI provides statistics on traffic counts over time, and top -t (default 10) URLs requested, to the first /section/. Alerts when the HTTP traffic rate surpasses the --alert-threshold per 2 minute timespan.
+
+	HTTP request URL paths are truncated to their first section. eg: 'http://man7.org/linux/man-pages/man1/intro.1.html' is truncated and counted as 'http://man7.org/linux'. A URL to file on first path variable gets counted as a root request. eg: 'http://man7.org/style.css' will be counted to increment 'http://man7.org/'.
+
+	If enabled by --log-sink and --log-level, logs are written periodically recording all of the information rendered in the terminal UI.
+
+	Using Berkley Packet Filtering; by default only port 80 is monitored for HTTP packets. However that can be configured by supplying a different BPF via --bpf.
+
+	Press 'q' to exit.
+
+Usage:
+  banken monitor [flags]
+
+Flags:
+  -a, --alert-threshold int   alerting threshold of http requests per 2 minute span  (default 10)
+  -b, --bpf string            BPF configuration string (default "tcp port 80")
+  -h, --help                  help for monitor
+  -t, --top-n-reqs int        top number of URL:RequestCounts to display (default 10)
+
+Global Flags:
+  -l, --log-level string   log verbosity level (default "info")
+  -s, --log-sink string    logging destination, leave blank to disable (default "/tmp/banken.log")
+```
 
 
 ## Building
@@ -19,47 +51,30 @@ All building and testing was done on a Linux machine. However it should be able 
 ### Build with Make
 
 * `make build` will compile the binary.
-* `make grant-capture` will `setcap cap_net_raw,cap_net_admin=eip` on the binary.
+* `make grant-capture` will `sudo setcap cap_net_raw,cap_net_admin=eip` grans pcap network access to the binary so it doesn't have to be run as root.
 * `make run` to execute Banken; listen to network traffic, reports statistics to terminal.
+* `make banken` is the one-stop-shop to build all of the above and run!
 
 ## Known Issues
 
-* Scrolling Alert messages, doesn't always work.
-    * Unsure as to the cause, with certain terminal sizes, scrolling of threshold alert notifications does not work. view.Run() invokes scroll function calls upon input, but for some reason it doesn't appear to function if the terminal width is smaller than ~100?
-    * All threshold alerts are logged, so they are still recorded.
-        * `cat banken.log | grep 'RequestRate Notification'`
-
-## Functionality Criteria
-
-* CLI tool monitoring HTTP traffic crossing local interfaces.
-* Shell 10 second status update
-    * Display traffic statistics
-        * http vs https traffic
-        * Total throughput
-    * HTTP traffic highest domain/section hits: http://hihi.com/hihi: 22, http://neh.wtf/: 1
-* Anomaly detection
-    * Configured threshold for http requests for sliding window of the past 2 minutes.
-    * When traffic for past 2 minutes has surpassed the configured threshold, signal an alert message.
-        * Format: `High traffic generated an alert - hits = {value}, triggered at {time}`
-        * Simple: print formatted text to shell
-        * Bonus: Track and print the highest number of 
-* Proper testing of components.
-* Integration testing of application.
+* Scrolling Alert messages; is fickle...
+    * Unsure as to the cause, with certain terminal sizes, scrolling of threshold alert notifications does not work. view.Run() invokes scroll function calls upon input, but for some reason it doesn't appear to function if the terminal width is smaller than ~100 wide?
+    * All threshold alerts are logged, so they are still recorded, but sometimes the terminal won't let user scroll over them.
+        * `cat banken.log | grep 'RequestRate Notification'` to see alert detector notifications.
 
 ## Implementation Design
 
 * Intercept all traffic from the local interfaces.
 * Filter traffic down to only HTTP requests.
-* Duplex HTTP requests to two consumers: Anomaly detector, and Route monitor.
-* Anomaly Detector:
-    * Input: Scalar count of HTTP reqs per 10s.
-    * Read HttpReq's and construct time series counter to detect if threshold is breached.
-    * Anomalyzer as a bonus to detect anomalies without relying on a static threshold setting.
+* Duplex HTTP requests to two consumers: AlertDetector, and Route monitor.
+* Alert Detector:
+    * Input data into timeseries query structure(see Acknowledgements).
+    * Query request count for the past 2 minutes; if above --alert-threshold; Alert UI. Conversely test 2 minute span, and notify UI when request count has dropped below threshold.
     * Nominal vs Alerted state machine
-        * Alerted state tracks the HTTP request/paths
+    * Also query TS counts for past 1m, 5m, 15m, 30m, 60m, 24hr request counts and update the UI.
 * Route monitor
-    * Retain key'd counts of `<host>/<slug>/*`
-    * 
+    * Retain key'd counts of `<host>/<slug>/*` & `<host>/*`
+    * Read out top N and update UI.
 
 ## Components
 

@@ -118,13 +118,17 @@ func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff
 			b.logger.WithFields(f).Infof("Top %d URLs", b.topN)
 
 			counts := make([]string, 0)
+			countFields := log.Fields{}
 			for _, i := range intervals {
 				now := time.Now()
 				c := b.ad.GetSpanCount(now.Add(-i.t), now)
 				if c > 0 {
-					counts = append(counts, fmt.Sprintf("%s: %d", i.s, c))
+					cStr := fmt.Sprintf("%s: %d", i.s, c)
+					countFields[i.s] = c
+					counts = append(counts, cStr)
 				}
 			}
+			b.logger.WithFields(countFields).Infof("http request count timespans")
 
 			if topN != nil && reqCnts != nil {
 				if len(top) == 0 {
