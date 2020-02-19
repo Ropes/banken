@@ -1,7 +1,7 @@
 [番犬](https://jisho.org/word/%E7%95%AA%E7%8A%AC)
 ------
 
-'Guard dog' application for monitoring HTTP traffic on local interfaces. Fun project to dig back into concurrency for potentially high load data streams.
+'Guard dog' application for monitoring HTTP traffic on local interfaces. Fun project to dig back into concurrency for potentially high load data streams. Learned some new libraries, refreshed some Go concurrency patterns, and regained appreciation of the test -race detector! Certainly could have been implemented with simpler data structures, but adding the UI later was easier thanks to component composition.
 
 ![Running with shortened alert timespan](https://user-images.githubusercontent.com/489062/74881612-7d09a900-5322-11ea-9742-44e7fe98937d.png)
 
@@ -61,10 +61,11 @@ All building and testing was done on a Linux machine. However it should be able 
     * Unsure as to the cause, with certain terminal sizes, scrolling of threshold alert notifications does not work. view.Run() invokes scroll function calls upon input, but for some reason it doesn't appear to function if the terminal width is smaller than ~100 wide?
     * All threshold alerts are logged, so they are still recorded, but sometimes the terminal won't let user scroll over them.
         * `cat banken.log | grep 'RequestRate Notification'` to see alert detector notifications.
+* Find something else? D: Submit an [issue](https://github.com/Ropes/banken/issues/new)!
 
 ## Implementation Design
 
-* Intercept all traffic from the local interfaces.
+* Intercept traffic constrained by BPF from the local interfaces.
 * Filter traffic down to only HTTP requests.
 * Duplex HTTP requests to two consumers: AlertDetector, and Route monitor.
 * Alert Detector:
@@ -76,24 +77,16 @@ All building and testing was done on a Linux machine. However it should be able 
     * Retain key'd counts of `<host>/<slug>/*` & `<host>/*`
     * Read out top N and update UI.
 
-## Components
-
-* Configuration 
-    * Read config information from EnvVars or CLI Flags.
-    * Intercept kill signals and dump stats on session at end of runtime.
-* Debugging
-    * Debug logging to StdErr
-    * Metrics to track?
-
-## Improvements to make
+## Potential Improvements to make
 * More integration tests. 
     * `make go-test-banken` does execute a test against actual interfaces. The testing could be expanded though.
-* Configurable Logging format.
+* Flag to configure Alert detection interval.(Shorten to less than 2 minutes)
+* Configurable Logging format. JSON, syslog, etc
 * Monitor HTTPS data flows and record traffic bandwidth per source.
     * Record bytes traversed per source/dest.
 * Smarter [anomaly detection](https://github.com/lytics/anomalyzer), which could take into acount average usage but still detect large spikes.
 * TermUI resizes nicely after launch(Currently does not).
-* Use [termui](https://github.com/gizak/termui) to add bar graphs of traffic volume.
+*  [termui](https://github.com/gizak/termui) bar graphs of traffic volume.
 
 ## Acknowledgements
 
