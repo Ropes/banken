@@ -3,10 +3,13 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"time"
 
+	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3/widgets"
 	"github.com/ropes/banken/pkg/sniff"
 	"github.com/ropes/banken/pkg/traffic"
 	log "github.com/sirupsen/logrus"
@@ -55,7 +58,7 @@ func NewBanken(ctx context.Context, at, topN int, bpf string, logger *log.Logger
 	}
 }
 
-func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
+func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff.HTTPXPacket, error) {
 	// Detect interfaces
 	ifaces, err := detectInterfaces()
 	if err != nil {
@@ -67,23 +70,34 @@ func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
 	notifications := make(chan traffic.Notification, 1)
 	b.ad = traffic.NewAlertDetector(b.ctx, time.Now(), 5, notifications)
 	go func(a *traffic.AlertDetector, logger *log.Logger) {
+		i := 0
 		for n := range notifications {
+			i++
 			logger.Infof("RequestRate Notification: %q", n.String())
+			alerts.Rows = append(alerts.Rows, fmt.Sprintf("[%d] %s", i, n.String()))
+			ui.Render(alerts)
 		}
 	}(b.ad, b.logger)
 
 	// Initialize Route Counter
 	b.rc = new(traffic.RequestCounter)
-	rcTick := time.NewTicker(10 * time.Second)
+	rcTick := time.NewTicker(5 * time.Second)
 	go func() {
 		for range rcTick.C {
 			m := b.rc.Export()
-			b.logger.Infof("Top %d URLs", b.topN)
+			f := log.Fields{}
 			reqs := topNRequests(m, b.topN)
-			for _, v := range reqs {
-				b.logger.Infof("%v %d", v.URL, v.C)
+			top := make([]string, b.topN)
+			for i, v := range reqs {
+				s := fmt.Sprintf("%s -> %d", v.URL, v.C)
+				f[fmt.Sprintf("%d", i+1)] = s
+				top = append(top, fmt.Sprintf("[%d]: %s", i+1, s))
 			}
+			topN.Rows = top
+			b.logger.WithFields(f).Infof("Top %d URLs", b.topN)
 
+			ui.Render(topN)
+			ui.Render(reqCnts)
 		}
 	}()
 

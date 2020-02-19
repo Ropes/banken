@@ -1,6 +1,6 @@
 // Package sniff provides functionality to interact with networking interfaces.
 //
-// Detecting the available interfaces,
+// Functionality which ties directly to the 
 package sniff
 
 import "net"
