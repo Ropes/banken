@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/signal"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/ropes/banken/cmd/banken/cmd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

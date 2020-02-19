@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/ropes/banken/pkg/sniff"
 	"github.com/ropes/banken/pkg/traffic"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
