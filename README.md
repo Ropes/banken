@@ -1,29 +1,27 @@
 [番犬](https://jisho.org/word/%E7%95%AA%E7%8A%AC)
 ------
 
-Guard dog application monitoring HTTP traffic on local interfaces.
+Guard dog application for monitoring HTTP traffic on local interfaces.
+
+
+
 
 ## Functionality Criteria
 
-* CLI tool monitoring HTTP traffic on local interfaces for indefinite amount of time.
-* Sniff HTTP(S) activity
-    * Track occurrences of HTTP address requests to the depth of first path slug.
+* CLI tool monitoring HTTP traffic crossing local interfaces.
 * Shell 10 second status update
     * Display traffic statistics
         * http vs https traffic
         * Total throughput
-    * HTTP traffic highest domain/slug hits: http://hihi.com/hihi: 22, http://neh.wtf/: 1
+    * HTTP traffic highest domain/section hits: http://hihi.com/hihi: 22, http://neh.wtf/: 1
 * Anomaly detection
-    * Configured threshold for http requests for sliding window of past 2 minutes.
-    * Detect when traffic for past 2 minutes has surpassed the configured threshold.
-    * Alert the shell/UI 
+    * Configured threshold for http requests for sliding window of the past 2 minutes.
+    * When traffic for past 2 minutes has surpassed the configured threshold, signal an alert message.
         * Format: `High traffic generated an alert - hits = {value}, triggered at {time}`
         * Simple: print formatted text to shell
         * Bonus: Track and print the highest number of 
-        * Bonus: update termui... list??
 * Proper testing of components.
 * Integration testing of application.
-    * Ginkgo?
 
 ## Implementation Design
 
@@ -50,9 +48,17 @@ Guard dog application monitoring HTTP traffic on local interfaces.
     * Metrics to track?
 * UI: ???
     * 1: Normal shell output with specified information dumps.
-    * 2: termui with nice updates and recording of data.
-    * 3: Mix of the two possible with anomaly recordings streaming up and lower section containing the stats box/window?
+
+## TODO Improvements
+
+* Monitor HTTPS data flows and record traffic bandwidth per source.
+    * Record bytes traversed per source/dest.
+* Smarter [anomaly detection](https://github.com/lytics/anomalyzer), which could take into acount average usage but still detect large spikes.
+* Use [termui](https://github.com/gizak/termui) for a clean updating interface.
+    * Mix of the two possible with anomaly recordings streaming up and lower section containing the stats box/window?
 
 ## Acknowledgements
 
-* Hard-copy import of the still experimental [golang.org/x/net/internal/timseries](https://pkg.go.dev/golang.org/x/net@v0.0.0-20200202094626-16171245cfb2/internal/timeseries?tab=doc) package to manage data. Package used by `x/net/trace` for compiling traffic statistics.
+* Hoisted source code from package of the still experimental [golang.org/x/net/internal/timseries](https://pkg.go.dev/golang.org/x/net@v0.0.0-20200202094626-16171245cfb2/internal/timeseries?tab=doc) package to manage data. The package used by `x/net/trace` for compiling traffic statistics, and provides minute-hour granularity bucketing, and automatic downsampling.
+
+
