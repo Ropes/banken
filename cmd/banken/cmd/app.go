@@ -5,7 +5,6 @@ import (
 	"context"
 	"net"
 	"os"
-	"os/signal"
 	"time"
 
 	"github.com/ropes/banken/pkg/sniff"
@@ -13,57 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
-
-const (
-	flagLogLevel     = "log-level"
-	flagLogSink      = "log-sink"
-	flagDebugLogSink = "debug-log-sink"
-	flagBPF          = "bpf"
-)
-
-var (
-	bpf            *string
-	logLevel       *string
-	logSink        *string
-	debugLogSink   *string
-	alertThreshold *int
-)
-
-func configuration() *log.Logger {
-	// Initialize Logging
-	logLevelVal, err := log.ParseLevel(*logLevel)
-	logger := log.New()
-	if err != nil {
-		logger.Fatalf("error parsing loglevel configuration: %v", err)
-	}
-	logger.SetLevel(logLevelVal)
-	if *logSink != "" {
-		var lf *os.File
-		var err error
-		if *logSink == "stderr" {
-			lf = os.Stderr
-		} else {
-			lf, err = os.OpenFile(*logSink, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-			if err != nil {
-				logger.Fatalf("unable to open %q for logging", *logSink)
-			}
-		}
-		defer lf.Close()
-		log.SetOutput(lf)
-	} else {
-		logger.SetOutput(os.Stdout)
-	}
-	return logger
-}
-
-func catchCancelSignal(can context.CancelFunc, sig ...os.Signal) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, sig...)
-	go func() {
-		<-c
-		can()
-	}()
-}
 
 func detectInterfaces() ([]string, error) {
 	output := make([]string, 0)
@@ -167,7 +115,7 @@ func (b *Banken) Run(ifaces []string, packetStream chan sniff.HTTPXPacket) {
 	for _, iface := range ifaces {
 		go func(iface string) {
 			ctxLogger := b.debugLogger.WithFields(log.Fields{"iface": iface})
-			b.debugLogger.Infof("BPF: %q", b.bpf)
+			b.debugLogger.Debugf("BPF: %q", b.bpf)
 			sniff.InterfaceListener(ctx, packetStream, iface, bpfFilter, 1600, ctxLogger.Logger)
 		}(iface)
 	}
