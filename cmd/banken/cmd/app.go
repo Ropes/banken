@@ -1,3 +1,4 @@
+// Package cmd contains the core application logic and goroutine launch points.
 package cmd
 
 import (
@@ -10,27 +11,23 @@ import (
 	"github.com/ropes/banken/pkg/sniff"
 	"github.com/ropes/banken/pkg/traffic"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 const (
-	flagLogLevel = "loglevel"
-	flagLogSink  = "logsink"
-	flagBPF      = "bpf"
+	flagLogLevel     = "log-level"
+	flagLogSink      = "log-sink"
+	flagDebugLogSink = "debug-log-sink"
+	flagBPF          = "bpf"
 )
 
 var (
 	bpf            *string
 	logLevel       *string
 	logSink        *string
+	debugLogSink   *string
 	alertThreshold *int
 )
-
-var rootCmd = &cobra.Command{
-	Use:   "banken",
-	Short: "http traffic monitor for unix systems",
-}
 
 func configuration() *log.Logger {
 	// Initialize Logging
@@ -86,16 +83,27 @@ type Banken struct {
 	logger      *log.Logger
 	debugLogger *log.Logger
 
+	at   int
+	topN int
+	bpf  string
+
 	rc     *traffic.RequestCounter
 	ad     *traffic.AlertDetector
 	status traffic.Notification
 }
 
-func NewBanken(ctx context.Context, logger *log.Logger) *Banken {
+func NewBanken(ctx context.Context, at, topN int, bpf string, logger *log.Logger) *Banken {
+	dl := log.New()
+	dl.SetOutput(os.Stderr)
+
 	return &Banken{
 		ctx:         ctx,
 		logger:      logger,
-		debugLogger: logger,
+		debugLogger: dl,
+
+		at:   at,
+		topN: topN,
+		bpf:  bpf,
 	}
 }
 
@@ -112,7 +120,7 @@ func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
 	b.ad = traffic.NewAlertDetector(b.ctx, time.Now(), 5, notifications)
 	go func(a *traffic.AlertDetector, logger *log.Logger) {
 		for n := range notifications {
-			logger.Infof("Alert Notification: %q", n.String())
+			logger.Infof("RequestRate Notification: %q", n.String())
 		}
 	}(b.ad, b.logger)
 
@@ -122,9 +130,10 @@ func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
 	go func() {
 		for range rcTick.C {
 			m := b.rc.Export()
-			b.debugLogger.Infof("Common URLs")
-			for k, v := range m {
-				b.logger.Infof("%v %d", k, v)
+			b.logger.Infof("Top %d URLs", b.topN)
+			reqs := topNRequests(m, b.topN)
+			for _, v := range reqs {
+				b.logger.Infof("%v %d", v.URL, v.C)
 			}
 
 		}
@@ -151,13 +160,14 @@ func (b *Banken) Init() ([]string, chan sniff.HTTPXPacket, error) {
 	return ifaces, packetStream, nil
 }
 
+// Run initializes traffic capture monitors for each interface.
 func (b *Banken) Run(ifaces []string, packetStream chan sniff.HTTPXPacket) {
 	ctx := b.ctx
-	// Initialize sniffer for each interface
 	bpfFilter := viper.GetString("bpf")
 	for _, iface := range ifaces {
 		go func(iface string) {
 			ctxLogger := b.debugLogger.WithFields(log.Fields{"iface": iface})
+			b.debugLogger.Infof("BPF: %q", b.bpf)
 			sniff.InterfaceListener(ctx, packetStream, iface, bpfFilter, 1600, ctxLogger.Logger)
 		}(iface)
 	}

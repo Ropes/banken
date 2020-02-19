@@ -35,7 +35,7 @@ func TestRequests(t *testing.T) {
 	defer can()
 	l := log.New()
 	l.SetOutput(os.Stderr)
-	b := NewBanken(ctx, l)
+	b := NewBanken(ctx, 10, 10, "", l)
 
 	ifaces, reqs, err := b.Init()
 	if err != nil {
