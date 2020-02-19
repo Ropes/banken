@@ -13,19 +13,17 @@ import (
 )
 
 const (
-	flagLogLevel     = "log-level"
-	flagLogSink      = "log-sink"
-	flagDebugLogSink = "debug-log-sink"
-	flagBPF          = "bpf"
-	flagTopReqs      = "top-n-reqs"
-	flagAlertThresh  = "alert-threshold"
+	flagLogLevel    = "log-level"
+	flagLogSink     = "log-sink"
+	flagBPF         = "bpf"
+	flagTopReqs     = "top-n-reqs"
+	flagAlertThresh = "alert-threshold"
 )
 
 var (
 	bpf            string
 	logLevel       string
 	logSink        string
-	debugLogSink   string
 	alertThreshold int
 	topNReqs       int
 )
@@ -34,7 +32,6 @@ func init() {
 	// Cobra configuration
 	rootCmd.PersistentFlags().StringVarP(&logLevel, flagLogLevel, "l", "info", "log verbosity level")
 	rootCmd.PersistentFlags().StringVarP(&logSink, flagLogSink, "s", "/tmp/banken.log", "logging destination, leave blank to disable")
-	rootCmd.PersistentFlags().StringVarP(&debugLogSink, flagDebugLogSink, "d", "stderr", "debug logging destination")
 
 	monitor.PersistentFlags().StringVarP(&bpf, flagBPF, "b", "tcp port 80 or port 443", "BPF configuration string")
 	monitor.PersistentFlags().IntVarP(&alertThreshold, flagAlertThresh, "a", 100, "alerting threshold of http requests per 2 minute span ")
@@ -87,7 +84,6 @@ func configuration() *log.Logger {
 	// Initialize Logging
 	logLevelVal, err := log.ParseLevel(logLevel)
 	logger := log.New()
-	debug := log.New()
 	if err != nil {
 		logger.Fatalf("error parsing loglevel configuration: %v", err)
 	}
@@ -104,10 +100,8 @@ func configuration() *log.Logger {
 			}
 		}
 		defer lf.Close()
-		debug.SetOutput(lf)
 	} else {
 		logger.SetOutput(os.Stdout)
-		debug.SetOutput(os.Stdout)
 	}
 	return logger
 }

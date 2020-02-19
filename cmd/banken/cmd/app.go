@@ -4,7 +4,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"time"
 
@@ -15,18 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
-
-func detectInterfaces() ([]string, error) {
-	output := make([]string, 0)
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-	for _, i := range ifaces {
-		output = append(output, i.Name)
-	}
-	return output, nil
-}
 
 // Banken 番犬　App manages launching cosumers of network traffic data
 // as well as the data storage structures. After startup it operates updating
@@ -64,7 +51,7 @@ func NewBanken(ctx context.Context, at, topN int, bpf string, logger *log.Logger
 // and updates the UI with http traffic status.
 func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff.HTTPXPacket, error) {
 	// Detect interfaces
-	ifaces, err := detectInterfaces()
+	ifaces, err := sniff.DetectInterfaces()
 	if err != nil {
 		b.logger.Fatal(err)
 		return nil, nil, err
@@ -172,7 +159,8 @@ func (b *Banken) Init(topN, reqCnts, alerts *widgets.List) ([]string, chan sniff
 	return ifaces, packetStream, nil
 }
 
-// Run initializes traffic capture monitors for each interface.
+// Run initializes traffic capture for each interface, feeding data
+// to analysis models.
 func (b *Banken) Run(ifaces []string, packetStream chan sniff.HTTPXPacket) {
 	ctx := b.ctx
 	bpfFilter := viper.GetString("bpf")
